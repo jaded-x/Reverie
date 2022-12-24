@@ -116,6 +116,7 @@ impl VulkanSwapchain {
             let framebuffer = unsafe { logical_device.create_framebuffer(&framebuffer_info, None) }?;
             self.framebuffers.push(framebuffer);
         }
+        
         Ok(())
     }
 

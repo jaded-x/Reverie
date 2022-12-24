@@ -7,6 +7,7 @@ use super::queue::*;
 use super::logical_device::LogicalDevice;
 use super::swapchain::VulkanSwapchain;
 use super::render_pass::RenderPass;
+use super::pipeline::Pipeline;
 
 const WINDOW_TITLE: &'static str = "Reverie";
 const WINDOW_WIDTH: u32 = 800;
@@ -25,6 +26,7 @@ pub struct VulkanApp {
     pub device: ash::Device,
     pub swapchain: VulkanSwapchain,
     pub renderpass: vk::RenderPass,
+    pub pipeline: Pipeline,
 }
 
 impl VulkanApp {
@@ -52,6 +54,8 @@ impl VulkanApp {
 
         swapchain.create_framebuffers(&logical_device, renderpass)?;
 
+        let pipeline = Pipeline::new(&logical_device, &swapchain, &renderpass)?;
+
         Ok(Self {
             entry,
             instance,
@@ -64,7 +68,8 @@ impl VulkanApp {
             queues,
             device: logical_device,
             swapchain,
-            renderpass
+            renderpass,
+            pipeline
         })
     }
 
@@ -122,6 +127,7 @@ impl Drop for VulkanApp {
         unsafe {
             self.device.device_wait_idle().expect("Failed to wait for device idle!");
 
+            self.pipeline.cleanup(&self.device);
             self.device.destroy_render_pass(self.renderpass, None);
             self.swapchain.cleanup(&self.device);
             self.device.destroy_device(None);

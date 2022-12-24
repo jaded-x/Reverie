@@ -6,3 +6,5 @@ pub mod queue;
 pub mod logical_device;
 pub mod swapchain;
 pub mod render_pass;
+pub mod pipeline;
+pub mod vertex;
