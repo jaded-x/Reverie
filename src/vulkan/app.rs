@@ -5,6 +5,7 @@ use super::debug::VulkanDebug;
 use super::physical_device::PhysicalDevice;
 use super::queue::*;
 use super::logical_device::LogicalDevice;
+use super::swapchain::VulkanSwapchain;
 
 const WINDOW_TITLE: &'static str = "Reverie";
 const WINDOW_WIDTH: u32 = 800;
@@ -20,6 +21,8 @@ pub struct VulkanApp {
     pub physical_device_features: vk::PhysicalDeviceFeatures,
     pub queue_families: QueueFamilies,
     pub queues: Queues,
+    pub device: ash::Device,
+    pub swapchain: VulkanSwapchain,
 }
 
 impl VulkanApp {
@@ -41,6 +44,8 @@ impl VulkanApp {
 
         let (logical_device, queues) = LogicalDevice::new(&instance, physical_device, &queue_families, &layer_names)?;
 
+        let mut swapchain = VulkanSwapchain::new(&instance, physical_device, &logical_device, &window, &queue_families, &queues)?;
+
         Ok(Self {
             entry,
             instance,
@@ -50,7 +55,9 @@ impl VulkanApp {
             physical_device_properties,
             physical_device_features,
             queue_families,
-            queues
+            queues,
+            device: logical_device,
+            swapchain
         })
     }
 
@@ -106,6 +113,9 @@ impl VulkanApp {
 impl Drop for VulkanApp {
     fn drop(&mut self) {
         unsafe {
+            self.swapchain.cleanup(&self.device);
+            self.device.destroy_device(None);
+            self.window.cleanup();
             self.debug.cleanup();
             self.instance.destroy_instance(None)
         };

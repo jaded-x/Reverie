@@ -37,18 +37,38 @@ impl VulkanWindow {
         })
     }
 
+    pub fn get_capabilities(&self, physical_device: vk::PhysicalDevice) -> Result<vk::SurfaceCapabilitiesKHR, vk::Result> {
+        unsafe {
+            self.surface_loader.get_physical_device_surface_capabilities(physical_device, self.surface)
+        }
+    }
+
+    pub fn get_present_modes(&self, physical_device: vk::PhysicalDevice) -> Result<Vec<vk::PresentModeKHR>, vk::Result> {
+        unsafe {
+            self.surface_loader.get_physical_device_surface_present_modes(physical_device, self.surface)
+        }
+    }
+
+    pub fn get_formats(&self, physical_device: vk::PhysicalDevice) -> Result<Vec<vk::SurfaceFormatKHR>, vk::Result> {
+        unsafe {
+            self.surface_loader.get_physical_device_surface_formats(physical_device, self.surface)
+        }
+    }
+
+    pub fn get_physical_device_surface_support(&self, physical_device: vk::PhysicalDevice, queue_family_index: usize) -> Result<bool, vk::Result> {
+        unsafe {
+            self.surface_loader.get_physical_device_surface_support(physical_device, queue_family_index as u32, self.surface)
+        }
+    }
+ 
     pub fn acquire_event_loop(&mut self) -> Result<EventLoop<()>> {
         match self.event_loop.take() {
             None => anyhow::bail!("EventLoop was acquired before."),
             Some(e) => Ok(e)
         }
     }
-}
 
-impl Drop for VulkanWindow {
-    fn drop(&mut self) {
-        unsafe {
-            self.surface_loader.destroy_surface(self.surface, None);
-        }
+    pub unsafe fn cleanup(&mut self) {
+        self.surface_loader.destroy_surface(self.surface, None);
     }
 }

@@ -4,3 +4,4 @@ pub mod debug;
 pub mod physical_device;
 pub mod queue;
 pub mod logical_device;
+pub mod swapchain;
