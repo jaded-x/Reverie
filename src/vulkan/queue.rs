@@ -35,3 +35,8 @@ impl QueueFamilies {
         Ok(queue_families)
     }
 }
+
+pub struct Queues {
+    pub graphics_queue: vk::Queue,
+    pub transfer_queue: vk::Queue,
+}

@@ -3,7 +3,8 @@ use ash::vk;
 use super::window::VulkanWindow;
 use super::debug::VulkanDebug;
 use super::physical_device::PhysicalDevice;
-use super::queue::QueueFamilies;
+use super::queue::*;
+use super::logical_device::LogicalDevice;
 
 const WINDOW_TITLE: &'static str = "Reverie";
 const WINDOW_WIDTH: u32 = 800;
@@ -18,6 +19,7 @@ pub struct VulkanApp {
     pub physical_device_properties: vk::PhysicalDeviceProperties,
     pub physical_device_features: vk::PhysicalDeviceFeatures,
     pub queue_families: QueueFamilies,
+    pub queues: Queues,
 }
 
 impl VulkanApp {
@@ -37,6 +39,8 @@ impl VulkanApp {
 
         let queue_families = QueueFamilies::new(&instance, physical_device, &window)?;
 
+        let (logical_device, queues) = LogicalDevice::new(&instance, physical_device, &queue_families, &layer_names)?;
+
         Ok(Self {
             entry,
             instance,
@@ -45,7 +49,8 @@ impl VulkanApp {
             physical_device,
             physical_device_properties,
             physical_device_features,
-            queue_families
+            queue_families,
+            queues
         })
     }
 
