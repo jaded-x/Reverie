@@ -6,6 +6,7 @@ use super::physical_device::PhysicalDevice;
 use super::queue::*;
 use super::logical_device::LogicalDevice;
 use super::swapchain::VulkanSwapchain;
+use super::render_pass::RenderPass;
 
 const WINDOW_TITLE: &'static str = "Reverie";
 const WINDOW_WIDTH: u32 = 800;
@@ -23,6 +24,7 @@ pub struct VulkanApp {
     pub queues: Queues,
     pub device: ash::Device,
     pub swapchain: VulkanSwapchain,
+    pub renderpass: vk::RenderPass,
 }
 
 impl VulkanApp {
@@ -46,6 +48,10 @@ impl VulkanApp {
 
         let mut swapchain = VulkanSwapchain::new(&instance, physical_device, &logical_device, &window, &queue_families, &queues)?;
 
+        let renderpass = RenderPass::new(&logical_device, physical_device, swapchain.surface_format.format)?;
+
+        swapchain.create_framebuffers(&logical_device, renderpass)?;
+
         Ok(Self {
             entry,
             instance,
@@ -57,7 +63,8 @@ impl VulkanApp {
             queue_families,
             queues,
             device: logical_device,
-            swapchain
+            swapchain,
+            renderpass
         })
     }
 
@@ -113,6 +120,9 @@ impl VulkanApp {
 impl Drop for VulkanApp {
     fn drop(&mut self) {
         unsafe {
+            self.device.device_wait_idle().expect("Failed to wait for device idle!");
+
+            self.device.destroy_render_pass(self.renderpass, None);
             self.swapchain.cleanup(&self.device);
             self.device.destroy_device(None);
             self.window.cleanup();

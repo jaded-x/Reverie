@@ -101,6 +101,24 @@ impl VulkanSwapchain {
         })
     }
 
+    pub fn create_framebuffers(&mut self, logical_device: &ash::Device, renderpass: vk::RenderPass) -> Result<(), vk::Result> {
+        let mut width = self.extent.width;
+        let mut height = self.extent.height;
+
+        for iv in &self.imageviews {
+            let iview = [*iv];
+            let framebuffer_info = vk::FramebufferCreateInfo::builder()
+                .render_pass(renderpass)
+                .attachments(&iview)
+                .width(width)
+                .height(height)
+                .layers(1);
+            let framebuffer = unsafe { logical_device.create_framebuffer(&framebuffer_info, None) }?;
+            self.framebuffers.push(framebuffer);
+        }
+        Ok(())
+    }
+
     pub unsafe fn cleanup(&mut self, logical_device: &ash::Device) {
         for fence in &self.may_begin_drawing {
             logical_device.destroy_fence(*fence, None);
