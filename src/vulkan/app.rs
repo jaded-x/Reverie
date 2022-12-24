@@ -10,8 +10,6 @@ use super::swapchain::VulkanSwapchain;
 use super::render_pass::RenderPass;
 use super::pipeline::Pipeline;
 use super::command_pools::Pools;
-use super::vertex_buffer::VertexBuffer;
-use super::index_buffer::IndexBuffer;
 use super::renderable::Renderable;
 
 const WINDOW_TITLE: &'static str = "Reverie";
@@ -22,6 +20,7 @@ pub struct VulkanApp {
     pub entry: ash::Entry,
     pub instance: ash::Instance,
     pub window: VulkanWindow,
+    pub is_framebuffer_resized: bool,
     pub debug: VulkanDebug,
     pub physical_device: vk::PhysicalDevice,
     pub physical_device_properties: vk::PhysicalDeviceProperties,
@@ -84,6 +83,7 @@ impl VulkanApp {
             entry,
             instance,
             window,
+            is_framebuffer_resized: false,
             debug,
             physical_device,
             physical_device_properties,
@@ -147,6 +147,45 @@ impl VulkanApp {
             .flags(create_flags);
 
         unsafe { entry.create_instance(&create_info, None) }
+    }
+
+    pub fn recreate_swapchain(&mut self) {
+        unsafe {
+            self.device 
+                .device_wait_idle()
+                .expect("Failed wto wait deviice idle (recreate swapchain)!")
+        };
+
+        unsafe {
+            self.device.free_command_buffers(self.pools.graphics_command_pool, &self.commandbuffers);
+            self.pools.cleanup(&self.device);
+            self.pipeline.cleanup(&self.device);
+            RenderPass::cleanup(&self.device, self.renderpass);
+            self.swapchain.cleanup(&self.device);
+        }
+
+        self.swapchain = VulkanSwapchain::new(&self.instance, self.physical_device, &self.device, &self.window, &self.queue_families, &self.queues)
+            .expect("Failed to recreate swapchain.");
+
+        self.renderpass = RenderPass::new(&self.device, self.physical_device, self.swapchain.surface_format.format)
+            .expect("Failed to recreate renderpass.");
+
+        self.swapchain.create_framebuffers(&self.device, self.renderpass)
+            .expect("Failed to recreate framebuffers.");
+
+        self.pipeline = Pipeline::new(&self.device, &self.swapchain, &self.renderpass)
+            .expect("Failed to recreate pipeline.");
+
+        self.pools = Pools::new(&self.device, &self.queue_families)
+            .expect("Failed to recreate pipeline.");
+
+        self.commandbuffers = Self::create_commandbuffers(&self.device, &self.pools, self.swapchain.image_count)
+            .expect("Failed to recreate commandbuffers.");
+
+        Self::fill_commandbuffers(&self.commandbuffers, &self.device, &self.renderpass, &self.swapchain, &self.pipeline, &self.renderables)
+            .expect("Failed to fill commmandbuffers");
+
+        println!("Swapchain recreated!");
     }
 
     pub fn create_commandbuffers(logical_device: &ash::Device, pools: &Pools, amount: usize) -> Result<Vec<vk::CommandBuffer>, vk::Result> {
@@ -215,6 +254,73 @@ impl VulkanApp {
         Ok(())
     }
 
+    pub fn draw_frame(&mut self) {
+        self.swapchain.current_image = {self.swapchain.current_image + 1} % self.swapchain.image_count as usize;
+
+        let (image_index, _is_sub_optimal) = unsafe {
+            let result = self.swapchain.swapchain_loader.acquire_next_image(
+                self.swapchain.swapchain, std::u64::MAX, self.swapchain.image_available[self.swapchain.current_image], vk::Fence::null());
+
+            match result {
+                Ok(image_index) => image_index,
+                Err(vk_result) => match vk_result {
+                    vk::Result::ERROR_OUT_OF_DATE_KHR => {
+                        self.recreate_swapchain();
+                        return;
+                    }
+                    _ => panic!("Failed to acquire swapchain image!")
+                }
+            }
+        };
+
+        unsafe {
+            self.device.wait_for_fences(&[self.swapchain.may_begin_drawing[self.swapchain.current_image]], true, std::u64::MAX)
+                .expect("Fence wait failed!");
+        }
+
+        let semaphores_available = [self.swapchain.image_available[self.swapchain.current_image]];
+        let waiting_stages = [vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT];
+        let semaphores_finished = [self.swapchain.rendering_finished[self.swapchain.current_image]];
+        let commandbuffers = [self.commandbuffers[image_index as usize]];
+        let submit_info = [vk::SubmitInfo::builder()
+            .wait_semaphores(&semaphores_available)
+            .wait_dst_stage_mask(&waiting_stages)
+            .command_buffers(&commandbuffers)
+            .signal_semaphores(&semaphores_finished)
+            .build()    
+        ];
+
+        unsafe {
+            self.device.reset_fences(&[self.swapchain.may_begin_drawing[self.swapchain.current_image]])
+                .expect("Fence reset failed!");
+
+            self.device.queue_submit(self.queues.graphics_queue, &submit_info, self.swapchain.may_begin_drawing[self.swapchain.current_image])
+                .expect("Failed to submit command buffer!");
+        }
+
+        let swapchains = [self.swapchain.swapchain];
+        let indices = [image_index];
+        let present_info = vk::PresentInfoKHR::builder()
+            .wait_semaphores(&semaphores_finished)
+            .swapchains(&swapchains)
+            .image_indices(&indices);
+        
+        let result = unsafe { self.swapchain.swapchain_loader.queue_present(self.queues.graphics_queue, &present_info) };
+
+        let is_resized = match result {
+            Ok(_) => self.is_framebuffer_resized,
+            Err(vk_result) => match vk_result {
+                vk::Result::ERROR_OUT_OF_DATE_KHR | vk::Result::SUBOPTIMAL_KHR => true,
+                _ => panic!("Failed to present swapchain image")
+            }
+        };
+
+        if is_resized {
+            self.is_framebuffer_resized = false;
+            self.recreate_swapchain();
+        }
+    }
+
     pub fn set_window_title(&self, title: &str) {
         self.window.window.set_title(title);
     }
@@ -235,6 +341,7 @@ impl Drop for VulkanApp {
             self.pipeline.cleanup(&self.device);
             self.device.destroy_render_pass(self.renderpass, None);
             self.swapchain.cleanup(&self.device);
+            std::mem::ManuallyDrop::drop(&mut self.allocator);
             self.device.destroy_device(None);
             self.window.cleanup();
             self.debug.cleanup();

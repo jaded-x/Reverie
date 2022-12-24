@@ -102,8 +102,8 @@ impl VulkanSwapchain {
     }
 
     pub fn create_framebuffers(&mut self, logical_device: &ash::Device, renderpass: vk::RenderPass) -> Result<(), vk::Result> {
-        let mut width = self.extent.width;
-        let mut height = self.extent.height;
+        let width = self.extent.width;
+        let height = self.extent.height;
 
         for iv in &self.imageviews {
             let iview = [*iv];
