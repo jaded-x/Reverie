@@ -1,8 +1,9 @@
 use ash::vk;
 
-use super::window::RendererWindow;
+use super::window::VulkanWindow;
 use super::debug::VulkanDebug;
 use super::physical_device::PhysicalDevice;
+use super::queue::QueueFamilies;
 
 const WINDOW_TITLE: &'static str = "Reverie";
 const WINDOW_WIDTH: u32 = 800;
@@ -11,28 +12,30 @@ const WINDOW_HEIGHT: u32 = 600;
 pub struct VulkanApp {
     pub entry: ash::Entry,
     pub instance: ash::Instance,
-    pub window: RendererWindow,
+    pub window: VulkanWindow,
     pub debug: VulkanDebug,
     pub physical_device: vk::PhysicalDevice,
     pub physical_device_properties: vk::PhysicalDeviceProperties,
-    pub physical_device_features: vk::PhysicalDeviceFeatures
+    pub physical_device_features: vk::PhysicalDeviceFeatures,
+    pub queue_families: QueueFamilies,
 }
 
 impl VulkanApp {
     pub fn new() -> Result<Self, Box<dyn std::error::Error>> {
-        let (event_loop, window) = RendererWindow::create_window(WINDOW_TITLE, WINDOW_WIDTH, WINDOW_HEIGHT)?;
+        let (event_loop, window) = VulkanWindow::create_window(WINDOW_TITLE, WINDOW_WIDTH, WINDOW_HEIGHT)?;
 
         let layer_names = vec!["VK_LAYER_KHRONOS_validation"]; 
         let entry = ash::Entry::linked();
         let instance = Self::create_instance(&entry, &layer_names, &window)
             .expect("Failed to initialize instance!");
+        let window = VulkanWindow::new(event_loop, window, &entry, &instance)?;
         
         let debug = VulkanDebug::new(&entry, &instance)?;
 
         let (physical_device, physical_device_properties, physical_device_features) = PhysicalDevice::pick_physical_device(&instance)
             .expect("No suitable physical device found!");
 
-        let window = RendererWindow::new(event_loop, window, &entry, &instance)?;
+        let queue_families = QueueFamilies::new(&instance, physical_device, &window)?;
 
         Ok(Self {
             entry,
@@ -41,7 +44,8 @@ impl VulkanApp {
             debug,
             physical_device,
             physical_device_properties,
-            physical_device_features
+            physical_device_features,
+            queue_families
         })
     }
 
