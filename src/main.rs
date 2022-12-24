@@ -13,9 +13,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             WindowEvent::CloseRequested => {
                 *controlflow = winit::event_loop::ControlFlow::Exit;
             }
-            WindowEvent::Resized(size) => {
-                println!("Window resized to {}px x {}px", size.width, size.height);
-            }
             _ => {}
         }
         _ => {}

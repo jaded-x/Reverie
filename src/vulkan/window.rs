@@ -20,7 +20,7 @@ impl RendererWindow {
         Ok((event_loop, window))
     }
 
-    pub fn new(event_loop: EventLoop<()>, window: Window, entry: &ash::Entry, instance: &ash::Instance
+    pub fn new(event_loop: EventLoop<()>, window: Window, _entry: &ash::Entry, _instance: &ash::Instance
     ) -> Result<RendererWindow> {
         Ok(RendererWindow {
             event_loop: Some(event_loop),

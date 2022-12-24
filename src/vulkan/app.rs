@@ -2,6 +2,7 @@ use ash::vk;
 
 use super::window::RendererWindow;
 use super::debug::VulkanDebug;
+use super::physical_device::PhysicalDevice;
 
 const WINDOW_TITLE: &'static str = "Reverie";
 const WINDOW_WIDTH: u32 = 800;
@@ -11,7 +12,10 @@ pub struct VulkanApp {
     pub entry: ash::Entry,
     pub instance: ash::Instance,
     pub window: RendererWindow,
-    pub debug: VulkanDebug
+    pub debug: VulkanDebug,
+    pub physical_device: vk::PhysicalDevice,
+    pub physical_device_properties: vk::PhysicalDeviceProperties,
+    pub physical_device_features: vk::PhysicalDeviceFeatures
 }
 
 impl VulkanApp {
@@ -20,9 +24,13 @@ impl VulkanApp {
 
         let layer_names = vec!["VK_LAYER_KHRONOS_validation"]; 
         let entry = ash::Entry::linked();
-        let instance = Self::create_instance(&entry, &layer_names, &window).expect("Failed to initialize instance!");
+        let instance = Self::create_instance(&entry, &layer_names, &window)
+            .expect("Failed to initialize instance!");
         
         let debug = VulkanDebug::new(&entry, &instance)?;
+
+        let (physical_device, physical_device_properties, physical_device_features) = PhysicalDevice::pick_physical_device(&instance)
+            .expect("No suitable physical device found!");
 
         let window = RendererWindow::new(event_loop, window, &entry, &instance)?;
 
@@ -30,7 +38,10 @@ impl VulkanApp {
             entry,
             instance,
             window,
-            debug
+            debug,
+            physical_device,
+            physical_device_properties,
+            physical_device_features
         })
     }
 
@@ -80,5 +91,14 @@ impl VulkanApp {
             .flags(create_flags);
 
         unsafe { entry.create_instance(&create_info, None) }
+    }
+}
+
+impl Drop for VulkanApp {
+    fn drop(&mut self) {
+        unsafe {
+            self.debug.cleanup();
+            self.instance.destroy_instance(None)
+        };
     }
 }
