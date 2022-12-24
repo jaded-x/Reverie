@@ -8,3 +8,4 @@ pub mod swapchain;
 pub mod render_pass;
 pub mod pipeline;
 pub mod vertex;
+pub mod command_pools;
