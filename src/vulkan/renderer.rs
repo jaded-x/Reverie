@@ -12,11 +12,7 @@ use super::pipeline::Pipeline;
 use super::command_pools::Pools;
 use super::renderable::Renderable;
 
-const WINDOW_TITLE: &'static str = "Reverie";
-const WINDOW_WIDTH: u32 = 800;
-const WINDOW_HEIGHT: u32 = 600;
-
-pub struct VulkanApp {
+pub struct VulkanRenderer {
     pub entry: ash::Entry,
     pub instance: ash::Instance,
     pub window: VulkanWindow,
@@ -37,9 +33,9 @@ pub struct VulkanApp {
     pub renderables: Vec<Renderable>
 }
 
-impl VulkanApp {
-    pub fn new() -> Result<Self, Box<dyn std::error::Error>> {
-        let (event_loop, window) = VulkanWindow::create_window(WINDOW_TITLE, WINDOW_WIDTH, WINDOW_HEIGHT)?;
+impl VulkanRenderer {
+    pub fn new(title: &'static str, width: u32, height: u32) -> Result<Self, Box<dyn std::error::Error>> {
+        let (event_loop, window) = VulkanWindow::create_window(title, width, height)?;
 
         let layer_names = vec!["VK_LAYER_KHRONOS_validation"]; 
         let entry = ash::Entry::linked();
@@ -56,9 +52,9 @@ impl VulkanApp {
 
         let (logical_device, queues) = LogicalDevice::new(&instance, physical_device, &queue_families, &layer_names)?;
 
-        let mut swapchain = VulkanSwapchain::new(&instance, physical_device, &logical_device, &window, &queue_families, &queues)?;
+        let mut swapchain = VulkanSwapchain::new(&instance, physical_device, &logical_device, &window, &queue_families)?;
 
-        let renderpass = RenderPass::new(&logical_device, physical_device, swapchain.surface_format.format)?;
+        let renderpass = RenderPass::init(&logical_device, swapchain.surface_format.format)?;
 
         swapchain.create_framebuffers(&logical_device, renderpass)?;
 
@@ -67,7 +63,7 @@ impl VulkanApp {
         let pools = Pools::new(&logical_device, &queue_families)?;
 
         let buffer_device_address = false;
-        let mut allocator = Allocator::new(&AllocatorCreateDesc {
+        let allocator = Allocator::new(&AllocatorCreateDesc {
             instance: instance.clone(),
             device: logical_device.clone(),
             physical_device,
@@ -153,7 +149,7 @@ impl VulkanApp {
         unsafe {
             self.device 
                 .device_wait_idle()
-                .expect("Failed wto wait deviice idle (recreate swapchain)!")
+                .expect("Failed to wait device idle (recreate swapchain)!")
         };
 
         unsafe {
@@ -164,10 +160,10 @@ impl VulkanApp {
             self.swapchain.cleanup(&self.device);
         }
 
-        self.swapchain = VulkanSwapchain::new(&self.instance, self.physical_device, &self.device, &self.window, &self.queue_families, &self.queues)
+        self.swapchain = VulkanSwapchain::new(&self.instance, self.physical_device, &self.device, &self.window, &self.queue_families)
             .expect("Failed to recreate swapchain.");
 
-        self.renderpass = RenderPass::new(&self.device, self.physical_device, self.swapchain.surface_format.format)
+        self.renderpass = RenderPass::init(&self.device, self.swapchain.surface_format.format)
             .expect("Failed to recreate renderpass.");
 
         self.swapchain.create_framebuffers(&self.device, self.renderpass)
@@ -211,7 +207,7 @@ impl VulkanApp {
 
             let clear_values = [vk::ClearValue {
                 color: vk::ClearColorValue {
-                    float32: [0.0, 0.0, 0.08, 1.0]
+                    float32: [0.0, 0.0, 0.0, 1.0]
                 }
             }];
 
@@ -326,7 +322,7 @@ impl VulkanApp {
     }
 }
 
-impl Drop for VulkanApp {
+impl Drop for VulkanRenderer {
     fn drop(&mut self) {
         unsafe {
             self.device.device_wait_idle().expect("Failed to wait for device idle!");

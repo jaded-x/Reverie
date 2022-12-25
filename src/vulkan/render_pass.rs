@@ -3,7 +3,7 @@ use ash::vk;
 pub struct RenderPass {}
 
 impl RenderPass {
-    pub fn new(logical_device: &ash::Device, physical_device: vk::PhysicalDevice, format: vk::Format) -> Result<vk::RenderPass, vk::Result> {
+    pub fn init(logical_device: &ash::Device, format: vk::Format) -> Result<vk::RenderPass, vk::Result> {
         let attachments = [vk::AttachmentDescription::builder()
             .format(format)
             .load_op(vk::AttachmentLoadOp::CLEAR)

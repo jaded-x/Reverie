@@ -24,10 +24,9 @@ impl VulkanSwapchain {
         logical_device: &ash::Device,
         window: &VulkanWindow,
         queue_families: &QueueFamilies,
-        queues: &Queues
     ) -> Result<VulkanSwapchain, vk::Result> {
         let surface_capabilities = window.get_capabilities(physical_device)?;
-        let mut extent = surface_capabilities.current_extent;
+        let extent = surface_capabilities.current_extent;
         let surface_present_modes = window.get_present_modes(physical_device)?;
         let surface_format = *window.get_formats(physical_device)?.first().unwrap();
         let queuefamilies = [queue_families.graphics.unwrap()];
@@ -46,7 +45,7 @@ impl VulkanSwapchain {
             .queue_family_indices(&queuefamilies)
             .pre_transform(surface_capabilities.current_transform)
             .composite_alpha(vk::CompositeAlphaFlagsKHR::OPAQUE)
-            .present_mode(vk::PresentModeKHR::FIFO);
+            .present_mode(vk::PresentModeKHR::FIFO); //Sync with monitor refresh rate
         
         let swapchain_loader = ash::extensions::khr::Swapchain::new(instance, logical_device);
         let swapchain = unsafe { swapchain_loader.create_swapchain(&swapchain_create_info, None)? };
