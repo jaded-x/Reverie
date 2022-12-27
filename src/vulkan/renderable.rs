@@ -5,24 +5,24 @@ use super::vertex_buffer::VertexBuffer;
 use super::index_buffer::IndexBuffer;
 use super::vertex::Vertex;
 
-pub struct Object {
+pub struct Renderable {
     pub vertex_buffers: Vec<VertexBuffer>,
     pub index_buffer: Option<IndexBuffer>
 }
 
-impl Object {
-    pub fn new(device: &ash::Device, allocator: &mut Allocator, vertex_count: usize, index_count: usize) -> Result<Object, vk::Result> {
+impl Renderable {
+    pub fn new(device: &ash::Device, allocator: &mut Allocator, vertex_count: usize, index_count: usize) -> Result<Self, vk::Result> {
         let mut vertex_buffers = vec![];
         let vertex_buffer = VertexBuffer::new(device, allocator, VertexBuffer::get_vertex_buffer_size(vertex_count));
         vertex_buffers.push(vertex_buffer);
         if index_count > 0 {
             let index_buffer = IndexBuffer::new(device, allocator, IndexBuffer::get_index_buffer_size(index_count));
-            Ok(Object {
+            Ok(Self {
                 vertex_buffers,
                 index_buffer: Some(index_buffer)
             })
         } else {
-            Ok(Object {
+            Ok(Self {
                 vertex_buffers,
                 index_buffer: None
             })
@@ -39,7 +39,7 @@ impl Object {
                 index_buffer.update_buffer(data);
             },
             None => {
-                println!("Tried to update indices buffer on a Object created without an index buffer!");
+                println!("Tried to update indices buffer on a Renderable created without an index buffer!");
             }
         }
     }

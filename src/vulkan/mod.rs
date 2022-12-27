@@ -11,5 +11,5 @@ pub mod vertex;
 pub mod command_pools;
 pub mod vertex_buffer;
 pub mod index_buffer;
-pub mod object;
+pub mod renderable;
 pub mod surface;

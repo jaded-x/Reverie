@@ -2,7 +2,7 @@ pub mod vulkan;
 
 use std::time::Instant;
 
-use vulkan::{renderer::*, vertex::Vertex, object::Object, window::VulkanWindow};
+use vulkan::{renderer::*, vertex::Vertex, renderable::Renderable, window::VulkanWindow};
 
 use winit::event::WindowEvent;
 
@@ -16,9 +16,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let mut now = Instant::now();
 
-    let object1 = Object::new(&renderer.device, &mut renderer.allocator, 4, 6)
-        .expect("Failed to create object");
-    renderer.objects.push(object1);
+    let renderable1 = Renderable::new(&renderer.device, &mut renderer.allocator, 4, 6)
+        .expect("Failed to create renderable");
+    renderer.renderables.push(renderable1);
 
 
     event_loop.run(move |event, _, controlflow| match event {
@@ -63,10 +63,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 2, 3, 0
             ];
 
-            renderer.objects.get_mut(0).unwrap().update_vertices_buffer(&vertices);
-            renderer.objects.get_mut(0).unwrap().update_indices_buffer(&indices);
+            renderer.renderables.get_mut(0).unwrap().update_vertices_buffer(&vertices);
+            renderer.renderables.get_mut(0).unwrap().update_indices_buffer(&indices);
 
-            VulkanRenderer::fill_commandbuffers(&renderer.commandbuffers, &renderer.device, &renderer.renderpass, &renderer.swapchain, &renderer.pipeline, &renderer.objects)
+            VulkanRenderer::fill_commandbuffers(&renderer.commandbuffers, &renderer.device, &renderer.renderpass, &renderer.swapchain, &renderer.pipeline, &renderer.renderables)
                 .expect("Failed to write commands!");
 
             renderer.draw_frame();

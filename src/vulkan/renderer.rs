@@ -10,7 +10,7 @@ use super::swapchain::VulkanSwapchain;
 use super::render_pass::RenderPass;
 use super::pipeline::Pipeline;
 use super::command_pools::Pools;
-use super::object::Object;
+use super::renderable::Renderable;
 
 pub struct VulkanRenderer {
     pub entry: ash::Entry,
@@ -30,7 +30,7 @@ pub struct VulkanRenderer {
     pub pools: Pools,
     pub commandbuffers: Vec<vk::CommandBuffer>,
     pub allocator: std::mem::ManuallyDrop<Allocator>,
-    pub objects: Vec<Object>
+    pub renderables: Vec<Renderable>
 }
 
 impl VulkanRenderer {
@@ -92,7 +92,7 @@ impl VulkanRenderer {
             pools,
             commandbuffers,
             allocator: std::mem::ManuallyDrop::new(allocator),
-            objects: vec![]
+            renderables: vec![]
         })
     }
 
@@ -177,7 +177,7 @@ impl VulkanRenderer {
         self.commandbuffers = Self::create_commandbuffers(&self.device, &self.pools, self.swapchain.image_count)
             .expect("Failed to recreate commandbuffers.");
 
-        Self::fill_commandbuffers(&self.commandbuffers, &self.device, &self.renderpass, &self.swapchain, &self.pipeline, &self.objects)
+        Self::fill_commandbuffers(&self.commandbuffers, &self.device, &self.renderpass, &self.swapchain, &self.pipeline, &self.renderables)
             .expect("Failed to fill commmandbuffers");
 
         println!("Swapchain recreated!");
@@ -191,7 +191,7 @@ impl VulkanRenderer {
         unsafe { logical_device.allocate_command_buffers(&commandbuffer_allocate_info) }
     }
 
-    pub fn fill_commandbuffers(commandbuffers: &[vk::CommandBuffer], logical_device: &ash::Device, renderpass: &vk::RenderPass, swapchain: &VulkanSwapchain, pipeline: &Pipeline, objects: &Vec<Object>
+    pub fn fill_commandbuffers(commandbuffers: &[vk::CommandBuffer], logical_device: &ash::Device, renderpass: &vk::RenderPass, swapchain: &VulkanSwapchain, pipeline: &Pipeline, renderables: &Vec<Renderable>
     ) -> Result<(), vk::Result> {
         unsafe {
             logical_device
@@ -222,19 +222,19 @@ impl VulkanRenderer {
             unsafe {
                 logical_device.cmd_begin_render_pass(commandbuffer, &renderpass_begininfo, vk::SubpassContents::INLINE);
 
-                for (_i, object) in objects.iter().enumerate() {
+                for (_i, renderable) in renderables.iter().enumerate() {
                     logical_device.cmd_bind_pipeline(commandbuffer, vk::PipelineBindPoint::GRAPHICS, pipeline.pipeline);
-                    match &object.index_buffer {
+                    match &renderable.index_buffer {
                         Some(index_buffer) => {
                             logical_device.cmd_bind_index_buffer(commandbuffer, index_buffer.get_buffer(), 0, vk::IndexType::UINT32);
 
-                            for vb in &object.vertex_buffers {
+                            for vb in &renderable.vertex_buffers {
                                 logical_device.cmd_bind_vertex_buffers(commandbuffer, 0, &[vb.get_buffer()], &[0]);
                                 logical_device.cmd_draw_indexed(commandbuffer, index_buffer.get_index_count(), 1, 0, 0, 0);
                             }
                         },
                         None => {
-                            for vb in &object.vertex_buffers {
+                            for vb in &renderable.vertex_buffers {
                                 logical_device.cmd_bind_vertex_buffers(commandbuffer, 0, &[vb.get_buffer()], &[0]);
                                 logical_device.cmd_draw(commandbuffer, vb.get_vertex_count(), 1, 0, 0);
                             }
@@ -322,8 +322,8 @@ impl Drop for VulkanRenderer {
         unsafe {
             self.device.device_wait_idle().expect("Failed to wait for device idle!");
 
-            for object in &mut self.objects {
-                object.destroy(&self.device, &mut self.allocator);
+            for renderable in &mut self.renderables {
+                renderable.destroy(&self.device, &mut self.allocator);
             }
 
             self.device.free_command_buffers(self.pools.graphics_command_pool, &self.commandbuffers);
