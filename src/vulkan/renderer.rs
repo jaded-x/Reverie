@@ -1,7 +1,7 @@
 use ash::vk;
 use gpu_allocator::vulkan::{Allocator, AllocatorCreateDesc};
 
-use super::window::VulkanWindow;
+use super::surface::VulkanSurface;
 use super::debug::VulkanDebug;
 use super::physical_device::PhysicalDevice;
 use super::queue::*;
@@ -10,14 +10,14 @@ use super::swapchain::VulkanSwapchain;
 use super::render_pass::RenderPass;
 use super::pipeline::Pipeline;
 use super::command_pools::Pools;
-use super::renderable::Renderable;
+use super::object::Object;
 
 pub struct VulkanRenderer {
     pub entry: ash::Entry,
     pub instance: ash::Instance,
-    pub window: VulkanWindow,
     pub is_framebuffer_resized: bool,
     pub debug: VulkanDebug,
+    pub surface: VulkanSurface,
     pub physical_device: vk::PhysicalDevice,
     pub physical_device_properties: vk::PhysicalDeviceProperties,
     pub physical_device_features: vk::PhysicalDeviceFeatures,
@@ -30,29 +30,28 @@ pub struct VulkanRenderer {
     pub pools: Pools,
     pub commandbuffers: Vec<vk::CommandBuffer>,
     pub allocator: std::mem::ManuallyDrop<Allocator>,
-    pub renderables: Vec<Renderable>
+    pub objects: Vec<Object>
 }
 
 impl VulkanRenderer {
-    pub fn new(title: &'static str, width: u32, height: u32) -> Result<Self, Box<dyn std::error::Error>> {
-        let (event_loop, window) = VulkanWindow::create_window(title, width, height)?;
-
+    pub fn new(window: &winit::window::Window) -> Result<Self, Box<dyn std::error::Error>> {
         let layer_names = vec!["VK_LAYER_KHRONOS_validation"]; 
         let entry = ash::Entry::linked();
         let instance = Self::create_instance(&entry, &layer_names, &window)
             .expect("Failed to initialize instance!");
-        let window = VulkanWindow::new(event_loop, window, &entry, &instance)?;
         
         let debug = VulkanDebug::new(&entry, &instance)?;
+
+        let surface = VulkanSurface::new(&window, &entry, &instance)?;
 
         let (physical_device, physical_device_properties, physical_device_features) = PhysicalDevice::pick_physical_device(&instance)
             .expect("No suitable physical device found!");
 
-        let queue_families = QueueFamilies::new(&instance, physical_device, &window)?;
+        let queue_families = QueueFamilies::new(&instance, physical_device, &surface)?;
 
         let (logical_device, queues) = LogicalDevice::new(&instance, physical_device, &queue_families, &layer_names)?;
 
-        let mut swapchain = VulkanSwapchain::new(&instance, physical_device, &logical_device, &window, &queue_families)?;
+        let mut swapchain = VulkanSwapchain::new(&instance, physical_device, &logical_device, &surface, &queue_families)?;
 
         let renderpass = RenderPass::init(&logical_device, swapchain.surface_format.format)?;
 
@@ -78,9 +77,9 @@ impl VulkanRenderer {
         Ok(Self {
             entry,
             instance,
-            window,
             is_framebuffer_resized: false,
             debug,
+            surface,
             physical_device,
             physical_device_properties,
             physical_device_features,
@@ -93,7 +92,7 @@ impl VulkanRenderer {
             pools,
             commandbuffers,
             allocator: std::mem::ManuallyDrop::new(allocator),
-            renderables: vec![]
+            objects: vec![]
         })
     }
 
@@ -160,7 +159,7 @@ impl VulkanRenderer {
             self.swapchain.cleanup(&self.device);
         }
 
-        self.swapchain = VulkanSwapchain::new(&self.instance, self.physical_device, &self.device, &self.window, &self.queue_families)
+        self.swapchain = VulkanSwapchain::new(&self.instance, self.physical_device, &self.device, &self.surface, &self.queue_families)
             .expect("Failed to recreate swapchain.");
 
         self.renderpass = RenderPass::init(&self.device, self.swapchain.surface_format.format)
@@ -178,7 +177,7 @@ impl VulkanRenderer {
         self.commandbuffers = Self::create_commandbuffers(&self.device, &self.pools, self.swapchain.image_count)
             .expect("Failed to recreate commandbuffers.");
 
-        Self::fill_commandbuffers(&self.commandbuffers, &self.device, &self.renderpass, &self.swapchain, &self.pipeline, &self.renderables)
+        Self::fill_commandbuffers(&self.commandbuffers, &self.device, &self.renderpass, &self.swapchain, &self.pipeline, &self.objects)
             .expect("Failed to fill commmandbuffers");
 
         println!("Swapchain recreated!");
@@ -192,7 +191,7 @@ impl VulkanRenderer {
         unsafe { logical_device.allocate_command_buffers(&commandbuffer_allocate_info) }
     }
 
-    pub fn fill_commandbuffers(commandbuffers: &[vk::CommandBuffer], logical_device: &ash::Device, renderpass: &vk::RenderPass, swapchain: &VulkanSwapchain, pipeline: &Pipeline, renderables: &Vec<Renderable>
+    pub fn fill_commandbuffers(commandbuffers: &[vk::CommandBuffer], logical_device: &ash::Device, renderpass: &vk::RenderPass, swapchain: &VulkanSwapchain, pipeline: &Pipeline, objects: &Vec<Object>
     ) -> Result<(), vk::Result> {
         unsafe {
             logical_device
@@ -223,19 +222,19 @@ impl VulkanRenderer {
             unsafe {
                 logical_device.cmd_begin_render_pass(commandbuffer, &renderpass_begininfo, vk::SubpassContents::INLINE);
 
-                for (_i, renderable) in renderables.iter().enumerate() {
+                for (_i, object) in objects.iter().enumerate() {
                     logical_device.cmd_bind_pipeline(commandbuffer, vk::PipelineBindPoint::GRAPHICS, pipeline.pipeline);
-                    match &renderable.index_buffer {
+                    match &object.index_buffer {
                         Some(index_buffer) => {
                             logical_device.cmd_bind_index_buffer(commandbuffer, index_buffer.get_buffer(), 0, vk::IndexType::UINT32);
 
-                            for vb in &renderable.vertex_buffers {
+                            for vb in &object.vertex_buffers {
                                 logical_device.cmd_bind_vertex_buffers(commandbuffer, 0, &[vb.get_buffer()], &[0]);
                                 logical_device.cmd_draw_indexed(commandbuffer, index_buffer.get_index_count(), 1, 0, 0, 0);
                             }
                         },
                         None => {
-                            for vb in &renderable.vertex_buffers {
+                            for vb in &object.vertex_buffers {
                                 logical_device.cmd_bind_vertex_buffers(commandbuffer, 0, &[vb.get_buffer()], &[0]);
                                 logical_device.cmd_draw(commandbuffer, vb.get_vertex_count(), 1, 0, 0);
                             }
@@ -316,10 +315,6 @@ impl VulkanRenderer {
             self.recreate_swapchain();
         }
     }
-
-    pub fn set_window_title(&self, title: &str) {
-        self.window.window.set_title(title);
-    }
 }
 
 impl Drop for VulkanRenderer {
@@ -327,8 +322,8 @@ impl Drop for VulkanRenderer {
         unsafe {
             self.device.device_wait_idle().expect("Failed to wait for device idle!");
 
-            for renderable in &mut self.renderables {
-                renderable.destroy(&self.device, &mut self.allocator);
+            for object in &mut self.objects {
+                object.destroy(&self.device, &mut self.allocator);
             }
 
             self.device.free_command_buffers(self.pools.graphics_command_pool, &self.commandbuffers);
@@ -339,7 +334,7 @@ impl Drop for VulkanRenderer {
             self.swapchain.cleanup(&self.device);
             std::mem::ManuallyDrop::drop(&mut self.allocator);
             self.device.destroy_device(None);
-            self.window.cleanup();
+            self.surface.cleanup();
             self.debug.cleanup();
             self.instance.destroy_instance(None)
         };

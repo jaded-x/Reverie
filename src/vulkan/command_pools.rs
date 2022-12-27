@@ -23,7 +23,7 @@ impl Pools {
         let transfer_command_pool = unsafe {
             logical_device
                 .create_command_pool(&transfer_command_pool_info, None)
-                .expect("A problem wiith the command pool creation")
+                .expect("A problem with the command pool creation")
         };
 
         Ok(Pools {

@@ -1,5 +1,5 @@
 use ash::vk;
-use super::window::VulkanWindow;
+use super::surface::VulkanSurface;
 use super::queue::*;
 
 pub struct VulkanSwapchain {
@@ -22,16 +22,15 @@ impl VulkanSwapchain {
         instance: &ash::Instance,
         physical_device: vk::PhysicalDevice,
         logical_device: &ash::Device,
-        window: &VulkanWindow,
+        surface: &VulkanSurface,
         queue_families: &QueueFamilies,
     ) -> Result<VulkanSwapchain, vk::Result> {
-        let surface_capabilities = window.get_capabilities(physical_device)?;
+        let surface_capabilities = surface.get_capabilities(physical_device)?;
         let extent = surface_capabilities.current_extent;
-        let surface_present_modes = window.get_present_modes(physical_device)?;
-        let surface_format = *window.get_formats(physical_device)?.first().unwrap();
+        let surface_format = *surface.get_formats(physical_device)?.first().unwrap();
         let queuefamilies = [queue_families.graphics.unwrap()];
         let swapchain_create_info = vk::SwapchainCreateInfoKHR::builder()
-            .surface(window.surface)
+            .surface(surface.surface)
             .min_image_count(3
                 .max(surface_capabilities.min_image_count)
                 .min(surface_capabilities.max_image_count)
