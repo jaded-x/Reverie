@@ -44,7 +44,7 @@ impl VulkanSwapchain {
             .queue_family_indices(&queuefamilies)
             .pre_transform(surface_capabilities.current_transform)
             .composite_alpha(vk::CompositeAlphaFlagsKHR::OPAQUE)
-            .present_mode(vk::PresentModeKHR::FIFO); //Sync with monitor refresh rate
+            .present_mode(vk::PresentModeKHR::IMMEDIATE); //Sync with monitor refresh rate
         
         let swapchain_loader = ash::extensions::khr::Swapchain::new(instance, logical_device);
         let swapchain = unsafe { swapchain_loader.create_swapchain(&swapchain_create_info, None)? };

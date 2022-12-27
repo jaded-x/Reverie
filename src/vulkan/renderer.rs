@@ -224,22 +224,10 @@ impl VulkanRenderer {
 
                 for (_i, renderable) in renderables.iter().enumerate() {
                     logical_device.cmd_bind_pipeline(commandbuffer, vk::PipelineBindPoint::GRAPHICS, pipeline.pipeline);
-                    match &renderable.index_buffer {
-                        Some(index_buffer) => {
-                            logical_device.cmd_bind_index_buffer(commandbuffer, index_buffer.get_buffer(), 0, vk::IndexType::UINT32);
+                    logical_device.cmd_bind_index_buffer(commandbuffer, renderable.index_buffer.get_buffer(), 0, vk::IndexType::UINT32);
+                    logical_device.cmd_bind_vertex_buffers(commandbuffer, 0, &[renderable.vertex_buffer.get_buffer()], &[0]);
+                    logical_device.cmd_draw_indexed(commandbuffer, renderable.index_buffer.get_index_count(), 1, 0, 0, 0);
 
-                            for vb in &renderable.vertex_buffers {
-                                logical_device.cmd_bind_vertex_buffers(commandbuffer, 0, &[vb.get_buffer()], &[0]);
-                                logical_device.cmd_draw_indexed(commandbuffer, index_buffer.get_index_count(), 1, 0, 0, 0);
-                            }
-                        },
-                        None => {
-                            for vb in &renderable.vertex_buffers {
-                                logical_device.cmd_bind_vertex_buffers(commandbuffer, 0, &[vb.get_buffer()], &[0]);
-                                logical_device.cmd_draw(commandbuffer, vb.get_vertex_count(), 1, 0, 0);
-                            }
-                        }
-                    }
                 }
 
                 logical_device.cmd_end_render_pass(commandbuffer);
