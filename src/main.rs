@@ -19,25 +19,26 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .expect("Failed to create renderable");
     renderer.renderables.push(renderable1);
 
-
     let vertices: [Vertex; 4] = [
         Vertex {
-            pos: [-0.5, -0.5, 0.0, 1.0],
-            color: [1.0, 0.0, 0.0, 1.0],
+            pos: glm::vec4(-0.5, -0.5, 0.0, 1.0),
+            color: glm::vec4(1.0, 0.0, 0.0, 1.0),
         },
         Vertex {
-            pos: [0.5, -0.5, 0.0, 1.0],
-            color: [0.0, 1.0, 0.0, 1.0],
+            pos: glm::vec4(0.5, -0.5, 0.0, 1.0),
+            color: glm::vec4(0.0, 1.0, 0.0, 1.0),
         },
         Vertex {
-            pos: [0.5, 0.5, 0.0, 1.0],
-            color: [0.0, 0.0, 1.0, 1.0],
+            pos: glm::vec4(0.5, 0.5, 0.0, 1.0),
+            color: glm::vec4(0.0, 0.0, 1.0, 1.0),
         },
         Vertex {
-            pos: [-0.5, 0.5, 0.0, 1.0],
-            color: [1.0, 1.0, 1.0, 1.0],
+            pos: glm::vec4(-0.5, 0.5, 0.0, 1.0),
+            color: glm::vec4(1.0, 1.0, 1.0, 1.0),
         },
     ];
+
+    
 
     let indices: [u32; 6] = [
         0, 1, 2,

@@ -22,7 +22,7 @@ impl IndexBuffer {
         };
 
         let mem_requirements = unsafe { device.get_buffer_memory_requirements(index_buffer) };
-        let location =MemoryLocation::CpuToGpu;
+        let location = MemoryLocation::CpuToGpu;
 
         let allocation = allocator.allocate(&AllocationCreateDesc {
             requirements: mem_requirements,
@@ -68,21 +68,21 @@ impl IndexBuffer {
 
     pub fn get_buffer(&self) -> vk::Buffer {
         self.buffer
-      }
-    
-      pub fn get_memory(&self) -> vk::DeviceMemory {
+    }
+
+    pub fn get_memory(&self) -> vk::DeviceMemory {
         unsafe { self.allocation.memory() }
-      }
-    
-      pub fn get_size(&self) -> vk::DeviceSize {
+    }
+
+    pub fn get_size(&self) -> vk::DeviceSize {
         self.allocation.size()
-      }
-      
-      pub fn get_offset(&self) -> vk::DeviceSize {
-        self.allocation.offset()
-      }
+    }
     
-      pub fn get_index_count(&self) -> u32 {
+    pub fn get_offset(&self) -> vk::DeviceSize {
+        self.allocation.offset()
+    }
+
+    pub fn get_index_count(&self) -> u32 {
         self.index_count
-      }
+    }
 }

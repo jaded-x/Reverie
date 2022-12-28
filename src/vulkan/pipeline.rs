@@ -63,8 +63,9 @@ impl Pipeline {
 
         let rasterizer_info = vk::PipelineRasterizationStateCreateInfo::builder()
             .line_width(1.0)
-            .front_face(vk::FrontFace::COUNTER_CLOCKWISE)
-            .cull_mode(vk::CullModeFlags::NONE)
+            .depth_clamp_enable(false)
+            .front_face(vk::FrontFace::CLOCKWISE)
+            .cull_mode(vk::CullModeFlags::BACK)
             .polygon_mode(vk::PolygonMode::FILL);
 
         let multisampler_info = vk::PipelineMultisampleStateCreateInfo::builder()
@@ -89,6 +90,13 @@ impl Pipeline {
         
         let colorblend_info = vk::PipelineColorBlendStateCreateInfo::builder().attachments(&colorblend_attachments);
 
+        let depthstencil_info = vk::PipelineDepthStencilStateCreateInfo::builder()
+            .depth_test_enable(true)
+            .depth_write_enable(true)
+            .depth_compare_op(vk::CompareOp::LESS)
+            .depth_bounds_test_enable(false)
+            .stencil_test_enable(false);
+
         let pipelinelayout_info = vk::PipelineLayoutCreateInfo::builder();
         let pipelinelayout = unsafe { logical_device.create_pipeline_layout(&pipelinelayout_info, None)? };
         
@@ -100,6 +108,7 @@ impl Pipeline {
             .rasterization_state(&rasterizer_info)
             .multisample_state(&multisampler_info)
             .color_blend_state(&colorblend_info)
+            .depth_stencil_state(&depthstencil_info)
             .layout(pipelinelayout)
             .render_pass(*renderpass)
             .subpass(0);

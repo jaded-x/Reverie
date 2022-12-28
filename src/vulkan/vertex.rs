@@ -4,8 +4,8 @@ use memoffset::offset_of;
 #[repr(C)]
 #[derive(Clone, Debug, Copy)]
 pub struct Vertex {
-    pub pos: [f32; 4],
-    pub color: [f32; 4],
+    pub pos: glm::Vec4,
+    pub color: glm::Vec4,
 }
 
 impl Vertex {
