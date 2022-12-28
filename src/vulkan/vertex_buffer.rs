@@ -5,8 +5,8 @@ use gpu_allocator::MemoryLocation;
 use super::vertex::Vertex;
 
 pub struct VertexBuffer {
-    pub buffer: vk::Buffer,
-    pub allocation: Allocation,
+    buffer: vk::Buffer,
+    allocation: Allocation,
     vertex_count: u32,
 }
 
@@ -69,23 +69,6 @@ impl VertexBuffer {
         self.vertex_count = data.len() as u32;
     }
 
-    pub fn get_buffer(&self) -> vk::Buffer {
-        self.buffer
-    }
-
-    pub fn get_memory(&self) -> vk::DeviceMemory {
-        unsafe { self.allocation.memory() }
-    }
-
-    pub fn get_size(&self) -> vk::DeviceSize {
-        self.allocation.size()
-    }
-
-    pub fn get_offset(&self) -> vk::DeviceSize {
-        self.allocation.offset()
-    }
-
-    pub fn get_vertex_count(&self) -> u32 {
-        self.vertex_count
-    }
+    pub fn get_buffer(&self) -> vk::Buffer { self.buffer }
+    pub fn get_vertex_count(&self) -> u32 { self.vertex_count }
 }

@@ -15,10 +15,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let mut now = Instant::now();
     
-    let renderable1 = Renderable::new(&renderer.device, &mut renderer.allocator, 4, 6)
-        .expect("Failed to create renderable");
+    let renderable1 = Renderable::new(&renderer.device, &mut renderer.allocator, 4, 6)?;
     renderer.renderables.push(renderable1);
-
+    
     let vertices: [Vertex; 4] = [
         Vertex {
             pos: glm::vec4(-0.5, -0.5, 0.0, 1.0),
@@ -37,8 +36,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             color: glm::vec4(1.0, 1.0, 1.0, 1.0),
         },
     ];
-
-    
 
     let indices: [u32; 6] = [
         0, 1, 2,
@@ -63,8 +60,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             window.set_title(&format!("{} - FPS: {:.0} ({:.3}ms)",
                 WINDOW_TITLE, fps.round(), delta_time));
 
-            renderer.renderables.get_mut(0).unwrap().vertex_buffer.update_buffer(&vertices);
-            renderer.renderables.get_mut(0).unwrap().index_buffer.update_buffer(&indices);
+            renderer.renderables.get_mut(0).unwrap().vertex_buffers[0].update_buffer(&vertices);
+            renderer.renderables.get_mut(0).unwrap().update_index_buffer(&indices);
 
             VulkanRenderer::fill_commandbuffers(&renderer.commandbuffers, &renderer.device, &renderer.renderpass, &renderer.swapchain, &renderer.pipeline, &renderer.renderables)
                 .expect("Failed to write commands!");

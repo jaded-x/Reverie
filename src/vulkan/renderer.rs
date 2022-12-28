@@ -185,8 +185,10 @@ impl VulkanRenderer {
 
     pub fn create_commandbuffers(logical_device: &ash::Device, pools: &Pools, amount: usize) -> Result<Vec<vk::CommandBuffer>, vk::Result> {
         let commandbuffer_allocate_info = vk::CommandBufferAllocateInfo::builder()
+            .level(vk::CommandBufferLevel::PRIMARY)
             .command_pool(pools.graphics_command_pool)
             .command_buffer_count(amount as u32);
+            
         
         unsafe { logical_device.allocate_command_buffers(&commandbuffer_allocate_info) }
     }
@@ -207,6 +209,11 @@ impl VulkanRenderer {
             let clear_values = [vk::ClearValue {
                 color: vk::ClearColorValue {
                     float32: [0.0, 0.0, 0.0, 1.0]
+                },
+            }, vk::ClearValue {
+                depth_stencil: vk::ClearDepthStencilValue {
+                    depth: 1.0,
+                    stencil: 0
                 }
             }];
 
@@ -224,10 +231,21 @@ impl VulkanRenderer {
 
                 for (_i, renderable) in renderables.iter().enumerate() {
                     logical_device.cmd_bind_pipeline(commandbuffer, vk::PipelineBindPoint::GRAPHICS, pipeline.pipeline);
-                    logical_device.cmd_bind_index_buffer(commandbuffer, renderable.index_buffer.get_buffer(), 0, vk::IndexType::UINT32);
-                    logical_device.cmd_bind_vertex_buffers(commandbuffer, 0, &[renderable.vertex_buffer.get_buffer()], &[0]);
-                    logical_device.cmd_draw_indexed(commandbuffer, renderable.index_buffer.get_index_count(), 1, 0, 0, 0);
-
+                    match &renderable.index_buffer {
+                        Some(index_buffer) => {
+                            logical_device.cmd_bind_index_buffer(commandbuffer, index_buffer.get_buffer(), 0, vk::IndexType::UINT32);
+                            for vertex_buffer in &renderable.vertex_buffers {
+                                logical_device.cmd_bind_vertex_buffers(commandbuffer, 0, &[vertex_buffer.get_buffer()], &[0]);
+                                logical_device.cmd_draw_indexed(commandbuffer, index_buffer.get_index_count(), 1, 0, 0, 0);
+                            }
+                        },
+                        None => {
+                            for vertex_buffer in &renderable.vertex_buffers {
+                                logical_device.cmd_bind_vertex_buffers(commandbuffer, 0, &[vertex_buffer.get_buffer()], &[0]);
+                                logical_device.cmd_draw(commandbuffer, vertex_buffer.get_vertex_count(), 1, 0, 0);
+                            }
+                        }
+                    }
                 }
 
                 logical_device.cmd_end_render_pass(commandbuffer);

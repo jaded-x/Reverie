@@ -12,14 +12,12 @@ impl Pipeline {
     pub fn new(logical_device: &ash::Device, swapchain: &VulkanSwapchain, renderpass: &vk::RenderPass) -> Result<Pipeline, vk::Result> {
         let main_function_name = std::ffi::CString::new("main").unwrap();
 
-        let vertexshader_createinfo = vk::ShaderModuleCreateInfo::builder().code(
-            vk_shader_macros::include_glsl!("./shaders/basic.vert", kind: vert)
-        );
+        let vertexshader_createinfo = vk::ShaderModuleCreateInfo::builder()
+            .code(vk_shader_macros::include_glsl!("./shaders/basic.vert", kind: vert));
         let vertexshader_module = unsafe { logical_device.create_shader_module(&vertexshader_createinfo, None)? };
 
-        let fragmentshader_createinfo = vk::ShaderModuleCreateInfo::builder().code(
-            vk_shader_macros::include_glsl!("./shaders/basic.frag", kind: frag)
-        );
+        let fragmentshader_createinfo = vk::ShaderModuleCreateInfo::builder()
+            .code(vk_shader_macros::include_glsl!("./shaders/basic.frag", kind: frag));
         let fragmentshader_module = unsafe { logical_device.create_shader_module(&fragmentshader_createinfo, None)? };
         
         let vertexshader_stage = vk::PipelineShaderStageCreateInfo::builder()
@@ -33,12 +31,12 @@ impl Pipeline {
         
         let shader_stages = [vertexshader_stage.build(), fragmentshader_stage.build()];
 
-        let vertex_attrib_descs = Vertex::get_attribute_descriptions();
-        let vertex_binding_descs = Vertex::get_binding_description();
+        let vertex_attribute_descscriptions = Vertex::get_attribute_descriptions();
+        let vertex_binding_descriptions = Vertex::get_binding_description();
 
         let vertex_input_info = vk::PipelineVertexInputStateCreateInfo::builder()
-            .vertex_attribute_descriptions(&vertex_attrib_descs)
-            .vertex_binding_descriptions(&vertex_binding_descs);
+            .vertex_attribute_descriptions(&vertex_attribute_descscriptions)
+            .vertex_binding_descriptions(&vertex_binding_descriptions);
 
         let input_assembly_info = vk::PipelineInputAssemblyStateCreateInfo::builder()
             .topology(vk::PrimitiveTopology::TRIANGLE_LIST);
@@ -115,7 +113,7 @@ impl Pipeline {
         
         let graphics_pipeline = unsafe {
             logical_device.create_graphics_pipelines(vk::PipelineCache::null(), &[pipeline_info.build()], None)
-                .expect("A problem with the pipeline creation")
+                .expect("Failed to create graphics pipeline")
         }[0];
 
         unsafe {
