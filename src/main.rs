@@ -17,23 +17,23 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     
     let renderable1 = Renderable::new(&renderer.device, &mut renderer.allocator, 4, 6)?;
     renderer.renderables.push(renderable1);
-    
+
     let vertices: [Vertex; 4] = [
         Vertex {
-            pos: glm::vec4(-0.5, -0.5, 0.0, 1.0),
-            color: glm::vec4(1.0, 0.0, 0.0, 1.0),
+            pos: uv::Vec4::new(-0.5, -0.5, 0.0, 1.0),
+            color: uv::Vec4::new(1.0, 0.0, 0.0, 1.0),
         },
         Vertex {
-            pos: glm::vec4(0.5, -0.5, 0.0, 1.0),
-            color: glm::vec4(0.0, 1.0, 0.0, 1.0),
+            pos: uv::Vec4::new(0.5, -0.5, 0.0, 1.0),
+            color: uv::Vec4::new(0.0, 1.0, 0.0, 1.0),
         },
         Vertex {
-            pos: glm::vec4(0.5, 0.5, 0.0, 1.0),
-            color: glm::vec4(0.0, 0.0, 1.0, 1.0),
+            pos: uv::Vec4::new(0.5, 0.5, 0.0, 1.0),
+            color: uv::Vec4::new(0.0, 0.0, 1.0, 1.0),
         },
         Vertex {
-            pos: glm::vec4(-0.5, 0.5, 0.0, 1.0),
-            color: glm::vec4(1.0, 1.0, 1.0, 1.0),
+            pos: uv::Vec4::new(-0.5, 0.5, 0.0, 1.0),
+            color: uv::Vec4::new(1.0, 1.0, 1.0, 1.0),
         },
     ];
 
@@ -43,7 +43,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     ];
 
     event_loop.run(move |event, _, controlflow| match event {
-        winit::event::Event::WindowEvent {event, .. } => match event {
+        winit::event::Event::WindowEvent {event, ..} => match event {
             WindowEvent::CloseRequested => {
                 *controlflow = winit::event_loop::ControlFlow::Exit;
             }

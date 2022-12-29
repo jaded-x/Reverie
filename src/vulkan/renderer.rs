@@ -179,8 +179,6 @@ impl VulkanRenderer {
 
         Self::fill_commandbuffers(&self.commandbuffers, &self.device, &self.renderpass, &self.swapchain, &self.pipeline, &self.renderables)
             .expect("Failed to fill commmandbuffers");
-
-        println!("Swapchain recreated!");
     }
 
     pub fn create_commandbuffers(logical_device: &ash::Device, pools: &Pools, amount: usize) -> Result<Vec<vk::CommandBuffer>, vk::Result> {
@@ -228,6 +226,23 @@ impl VulkanRenderer {
 
             unsafe {
                 logical_device.cmd_begin_render_pass(commandbuffer, &renderpass_begininfo, vk::SubpassContents::INLINE);
+
+                let viewports = [vk::Viewport {
+                    x: 0.0,
+                    y: 0.0,
+                    width: swapchain.extent.width as f32,
+                    height: swapchain.extent.height as f32,
+                    min_depth: 0.0,
+                    max_depth: 1.0,
+                }];
+
+                let scissors = [vk::Rect2D {
+                    offset: vk::Offset2D { x: 0, y: 0 },
+                    extent: swapchain.extent
+                }];
+                
+                logical_device.cmd_set_viewport(commandbuffer, 0, &viewports);
+                logical_device.cmd_set_scissor(commandbuffer, 0, &scissors);
 
                 for (_i, renderable) in renderables.iter().enumerate() {
                     logical_device.cmd_bind_pipeline(commandbuffer, vk::PipelineBindPoint::GRAPHICS, pipeline.pipeline);

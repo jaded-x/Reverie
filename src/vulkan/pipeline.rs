@@ -94,7 +94,10 @@ impl Pipeline {
             .depth_compare_op(vk::CompareOp::LESS)
             .depth_bounds_test_enable(false)
             .stencil_test_enable(false);
-
+        
+        let dynamic_state_info = vk::PipelineDynamicStateCreateInfo::builder()
+            .dynamic_states(&[vk::DynamicState::SCISSOR, vk::DynamicState::VIEWPORT]);
+        
         let pipelinelayout_info = vk::PipelineLayoutCreateInfo::builder();
         let pipelinelayout = unsafe { logical_device.create_pipeline_layout(&pipelinelayout_info, None)? };
         
@@ -107,10 +110,11 @@ impl Pipeline {
             .multisample_state(&multisampler_info)
             .color_blend_state(&colorblend_info)
             .depth_stencil_state(&depthstencil_info)
+            .dynamic_state(&dynamic_state_info)
             .layout(pipelinelayout)
             .render_pass(*renderpass)
             .subpass(0);
-        
+
         let graphics_pipeline = unsafe {
             logical_device.create_graphics_pipelines(vk::PipelineCache::null(), &[pipeline_info.build()], None)
                 .expect("Failed to create graphics pipeline")
