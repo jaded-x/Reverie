@@ -1,4 +1,5 @@
 pub mod vulkan;
+pub mod utils;
 
 use std::time::Instant;
 
@@ -11,6 +12,7 @@ const WINDOW_HEIGHT: u32 = 600;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let (event_loop, window) = VulkanWindow::create_window(WINDOW_TITLE, WINDOW_WIDTH, WINDOW_HEIGHT)?;
+
     let mut renderer = VulkanRenderer::new(&window)?;
 
     let mut now = Instant::now();
@@ -50,24 +52,29 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             _ => {}
         }
         winit::event::Event::MainEventsCleared => {
-            window.request_redraw();
+            window.window.request_redraw();
         }
         winit::event::Event::RedrawRequested(_) => {
             let delta_time = now.elapsed().as_secs_f32() * 1000.0;
             now = Instant::now();
             let fps = ((1000.0 / delta_time) * 10.0).round() / 10.0;
 
-            window.set_title(&format!("{} - FPS: {:.0} ({:.3}ms)",
+            window.window.set_title(&format!("{} - FPS: {:.0} ({:.3}ms)",
                 WINDOW_TITLE, fps.round(), delta_time));
 
             renderer.renderables.get_mut(0).unwrap().vertex_buffers[0].update_buffer(&vertices);
             renderer.renderables.get_mut(0).unwrap().update_index_buffer(&indices);
 
-            VulkanRenderer::fill_commandbuffers(&renderer.commandbuffers, &renderer.device, &renderer.renderpass, &renderer.swapchain, &renderer.pipeline, &renderer.renderables)
+            VulkanRenderer::fill_commandbuffers(&renderer.command_buffers, &renderer.device, &renderer.renderpass, &renderer.swapchain, &renderer.pipeline, &renderer.renderables)
                 .expect("Failed to write commands!");
 
             renderer.draw_frame();
         }
         _ => {}
     });
+}
+
+pub struct PushConstantData {
+    _offset: uv::Vec4,
+    _color: uv::Vec4
 }

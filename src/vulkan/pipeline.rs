@@ -3,13 +3,15 @@ use ash::vk;
 use super::swapchain::VulkanSwapchain;
 use super::vertex::Vertex;
 
+use crate::PushConstantData;
+
 pub struct Pipeline {
     pub pipeline: vk::Pipeline,
     pub layout: vk::PipelineLayout,
 }
 
 impl Pipeline {
-    pub fn new(logical_device: &ash::Device, swapchain: &VulkanSwapchain, renderpass: &vk::RenderPass) -> Result<Pipeline, vk::Result> {
+    pub fn new(logical_device: &ash::Device, swapchain: &VulkanSwapchain, renderpass: &vk::RenderPass) -> Result<Self, vk::Result> {
         let main_function_name = std::ffi::CString::new("main").unwrap();
 
         let vertexshader_createinfo = vk::ShaderModuleCreateInfo::builder()
@@ -40,7 +42,7 @@ impl Pipeline {
 
         let input_assembly_info = vk::PipelineInputAssemblyStateCreateInfo::builder()
             .topology(vk::PrimitiveTopology::TRIANGLE_LIST);
-        
+
         let viewports = [vk::Viewport {
             x: 0.0,
             y: 0.0,
@@ -54,7 +56,7 @@ impl Pipeline {
             offset: vk::Offset2D { x: 0, y: 0 },
             extent: swapchain.extent
         }];
-
+        
         let viewport_info = vk::PipelineViewportStateCreateInfo::builder()
             .viewports(&viewports)
             .scissors(&scissors);
@@ -97,10 +99,17 @@ impl Pipeline {
         
         let dynamic_state_info = vk::PipelineDynamicStateCreateInfo::builder()
             .dynamic_states(&[vk::DynamicState::SCISSOR, vk::DynamicState::VIEWPORT]);
-        
-        let pipelinelayout_info = vk::PipelineLayoutCreateInfo::builder();
-        let pipelinelayout = unsafe { logical_device.create_pipeline_layout(&pipelinelayout_info, None)? };
-        
+
+        let push_constant_range = [vk::PushConstantRange::builder()
+            .stage_flags(vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::FRAGMENT)
+            .offset(0)
+            .size(std::mem::size_of::<PushConstantData>() as u32)
+            .build()];
+
+        let pipelinelayout_info = vk::PipelineLayoutCreateInfo::builder()
+            .push_constant_ranges(&push_constant_range);
+        let pipeline_layout = unsafe { logical_device.create_pipeline_layout(&pipelinelayout_info, None)? };
+
         let pipeline_info = vk::GraphicsPipelineCreateInfo::builder()
             .stages(&shader_stages)
             .vertex_input_state(&vertex_input_info)
@@ -111,7 +120,7 @@ impl Pipeline {
             .color_blend_state(&colorblend_info)
             .depth_stencil_state(&depthstencil_info)
             .dynamic_state(&dynamic_state_info)
-            .layout(pipelinelayout)
+            .layout(pipeline_layout)
             .render_pass(*renderpass)
             .subpass(0);
 
@@ -125,9 +134,9 @@ impl Pipeline {
             logical_device.destroy_shader_module(vertexshader_module, None);
         }
 
-        Ok(Pipeline {
+        Ok(Self {
             pipeline: graphics_pipeline,
-            layout: pipelinelayout
+            layout: pipeline_layout
         })
     }
 

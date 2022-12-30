@@ -1,14 +1,16 @@
 use ash::vk;
 
+use super::window::VulkanWindow;
+
 pub struct VulkanSurface {
     pub surface: vk::SurfaceKHR,
     pub surface_loader: ash::extensions::khr::Surface
 }
 
 impl VulkanSurface {
-    pub fn new(window: &winit::window::Window, entry: &ash::Entry, instance: &ash::Instance
+    pub fn new(window: &VulkanWindow, entry: &ash::Entry, instance: &ash::Instance
     ) -> Result<Self, vk::Result> {
-        let surface = unsafe { ash_window::create_surface(&entry, &instance, &window, None).unwrap() };
+        let surface = unsafe { ash_window::create_surface(&entry, &instance, &window.window, None).unwrap() };
         let surface_loader = ash::extensions::khr::Surface::new(&entry, &instance);
 
         Ok(Self {

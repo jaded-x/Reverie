@@ -1,6 +1,7 @@
 use ash::vk;
 use gpu_allocator::vulkan::{Allocator, AllocatorCreateDesc};
 
+use super::window::VulkanWindow;
 use super::surface::VulkanSurface;
 use super::debug::VulkanDebug;
 use super::physical_device::PhysicalDevice;
@@ -11,6 +12,8 @@ use super::render_pass::RenderPass;
 use super::pipeline::Pipeline;
 use super::command_pools::Pools;
 use super::renderable::Renderable;
+
+use crate::PushConstantData;
 
 pub struct VulkanRenderer {
     pub entry: ash::Entry,
@@ -28,13 +31,13 @@ pub struct VulkanRenderer {
     pub renderpass: vk::RenderPass,
     pub pipeline: Pipeline,
     pub pools: Pools,
-    pub commandbuffers: Vec<vk::CommandBuffer>,
+    pub command_buffers: Vec<vk::CommandBuffer>,
     pub allocator: std::mem::ManuallyDrop<Allocator>,
     pub renderables: Vec<Renderable>
 }
 
 impl VulkanRenderer {
-    pub fn new(window: &winit::window::Window) -> Result<Self, Box<dyn std::error::Error>> {
+    pub fn new(window: &VulkanWindow) -> Result<Self, Box<dyn std::error::Error>> {
         let layer_names = vec!["VK_LAYER_KHRONOS_validation"]; 
         let entry = ash::Entry::linked();
         let instance = Self::create_instance(&entry, &layer_names, &window)
@@ -71,7 +74,7 @@ impl VulkanRenderer {
         }).expect("Failed to create allocator!");
         allocator.report_memory_leaks(log::Level::Info);
 
-        let commandbuffers = Self::create_commandbuffers(&logical_device, &pools, swapchain.image_count)?;
+        let command_buffers = Self::create_commandbuffers(&logical_device, &pools, swapchain.image_count)?;
 
         
         Ok(Self {
@@ -90,13 +93,13 @@ impl VulkanRenderer {
             renderpass,
             pipeline,
             pools,
-            commandbuffers,
+            command_buffers,
             allocator: std::mem::ManuallyDrop::new(allocator),
             renderables: vec![]
         })
     }
 
-    pub fn create_instance(entry: &ash::Entry, layer_names: &[&str], window: &winit::window::Window) -> Result<ash::Instance, vk::Result> {
+    pub fn create_instance(entry: &ash::Entry, layer_names: &[&str], window: &VulkanWindow) -> Result<ash::Instance, vk::Result> {
         let app_name = std::ffi::CString::new("Reverie Engine").unwrap();
         let engine_name = std::ffi::CString::new("Reverie").unwrap();
 
@@ -121,7 +124,7 @@ impl VulkanRenderer {
             vec![
                 ash::extensions::ext::DebugUtils::name().as_ptr(),
             ];
-        let required_surface_extensions = ash_window::enumerate_required_extensions(&window)
+        let required_surface_extensions = ash_window::enumerate_required_extensions(&window.window)
             .unwrap()
             .iter()
             .map(|ext| *ext)
@@ -152,7 +155,7 @@ impl VulkanRenderer {
         };
 
         unsafe {
-            self.device.free_command_buffers(self.pools.graphics_command_pool, &self.commandbuffers);
+            self.device.free_command_buffers(self.pools.graphics_command_pool, &self.command_buffers);
             self.pools.cleanup(&self.device);
             self.pipeline.cleanup(&self.device);
             RenderPass::cleanup(&self.device, self.renderpass);
@@ -174,10 +177,10 @@ impl VulkanRenderer {
         self.pools = Pools::new(&self.device, &self.queue_families)
             .expect("Failed to recreate pipeline.");
 
-        self.commandbuffers = Self::create_commandbuffers(&self.device, &self.pools, self.swapchain.image_count)
-            .expect("Failed to recreate commandbuffers.");
+        self.command_buffers = Self::create_commandbuffers(&self.device, &self.pools, self.swapchain.image_count)
+            .expect("Failed to recreate command_buffers.");
 
-        Self::fill_commandbuffers(&self.commandbuffers, &self.device, &self.renderpass, &self.swapchain, &self.pipeline, &self.renderables)
+        Self::fill_commandbuffers(&self.command_buffers, &self.device, &self.renderpass, &self.swapchain, &self.pipeline, &self.renderables)
             .expect("Failed to fill commmandbuffers");
     }
 
@@ -191,7 +194,7 @@ impl VulkanRenderer {
         unsafe { logical_device.allocate_command_buffers(&commandbuffer_allocate_info) }
     }
 
-    pub fn fill_commandbuffers(commandbuffers: &[vk::CommandBuffer], logical_device: &ash::Device, renderpass: &vk::RenderPass, swapchain: &VulkanSwapchain, pipeline: &Pipeline, renderables: &Vec<Renderable>
+    pub fn fill_commandbuffers(command_buffers: &[vk::CommandBuffer], logical_device: &ash::Device, renderpass: &vk::RenderPass, swapchain: &VulkanSwapchain, pipeline: &Pipeline, renderables: &Vec<Renderable>
     ) -> Result<(), vk::Result> {
         unsafe {
             logical_device
@@ -199,9 +202,9 @@ impl VulkanRenderer {
                 .expect("Fence wait failed!");
         }
 
-        for (i, &commandbuffer) in commandbuffers.iter().enumerate() {
+        for (i, &command_buffer) in command_buffers.iter().enumerate() {
             let commandbuffer_begininfo = vk::CommandBufferBeginInfo::builder();
-            unsafe { logical_device.begin_command_buffer(commandbuffer, &commandbuffer_begininfo)?; }
+            unsafe { logical_device.begin_command_buffer(command_buffer, &commandbuffer_begininfo)?; }
         
 
             let clear_values = [vk::ClearValue {
@@ -225,7 +228,7 @@ impl VulkanRenderer {
                 .clear_values(&clear_values);
 
             unsafe {
-                logical_device.cmd_begin_render_pass(commandbuffer, &renderpass_begininfo, vk::SubpassContents::INLINE);
+                logical_device.cmd_begin_render_pass(command_buffer, &renderpass_begininfo, vk::SubpassContents::INLINE);
 
                 let viewports = [vk::Viewport {
                     x: 0.0,
@@ -241,30 +244,42 @@ impl VulkanRenderer {
                     extent: swapchain.extent
                 }];
                 
-                logical_device.cmd_set_viewport(commandbuffer, 0, &viewports);
-                logical_device.cmd_set_scissor(commandbuffer, 0, &scissors);
+                logical_device.cmd_set_viewport(command_buffer, 0, &viewports);
+                logical_device.cmd_set_scissor(command_buffer, 0, &scissors);
 
                 for (_i, renderable) in renderables.iter().enumerate() {
-                    logical_device.cmd_bind_pipeline(commandbuffer, vk::PipelineBindPoint::GRAPHICS, pipeline.pipeline);
+                    logical_device.cmd_bind_pipeline(command_buffer, vk::PipelineBindPoint::GRAPHICS, pipeline.pipeline);
                     match &renderable.index_buffer {
                         Some(index_buffer) => {
-                            logical_device.cmd_bind_index_buffer(commandbuffer, index_buffer.get_buffer(), 0, vk::IndexType::UINT32);
+                            logical_device.cmd_bind_index_buffer(command_buffer, index_buffer.get_buffer(), 0, vk::IndexType::UINT32);
                             for vertex_buffer in &renderable.vertex_buffers {
-                                logical_device.cmd_bind_vertex_buffers(commandbuffer, 0, &[vertex_buffer.get_buffer()], &[0]);
-                                logical_device.cmd_draw_indexed(commandbuffer, index_buffer.get_index_count(), 1, 0, 0, 0);
+                                logical_device.cmd_bind_vertex_buffers(command_buffer, 0, &[vertex_buffer.get_buffer()], &[0]);
+
+                                for j in 0..4 {
+                                    let float = j as f32;
+                                    let push = PushConstantData {
+                                        _offset: uv::Vec4::new(0.0, -0.4 * float * 0.25, 0.0, 1.0),
+                                        _color: uv::Vec4::new(0.0, 0.0, 0.2 + 0.2 * float, 1.0)
+                                    };
+                                    let bytes = crate::utils::any_as_u8_slice(&push);
+
+                                    logical_device.cmd_push_constants(command_buffer, pipeline.layout, vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::FRAGMENT, 0, &bytes);
+                                    logical_device.cmd_draw_indexed(command_buffer, index_buffer.get_index_count(), 1, 0, 0, 0);
+                                }
+                                
                             }
                         },
                         None => {
                             for vertex_buffer in &renderable.vertex_buffers {
-                                logical_device.cmd_bind_vertex_buffers(commandbuffer, 0, &[vertex_buffer.get_buffer()], &[0]);
-                                logical_device.cmd_draw(commandbuffer, vertex_buffer.get_vertex_count(), 1, 0, 0);
+                                logical_device.cmd_bind_vertex_buffers(command_buffer, 0, &[vertex_buffer.get_buffer()], &[0]);
+                                logical_device.cmd_draw(command_buffer, vertex_buffer.get_vertex_count(), 1, 0, 0);
                             }
                         }
                     }
                 }
 
-                logical_device.cmd_end_render_pass(commandbuffer);
-                logical_device.end_command_buffer(commandbuffer)?;
+                logical_device.cmd_end_render_pass(command_buffer);
+                logical_device.end_command_buffer(command_buffer)?;
             }
         }
         Ok(())
@@ -297,11 +312,11 @@ impl VulkanRenderer {
         let semaphores_available = [self.swapchain.image_available[self.swapchain.current_image]];
         let waiting_stages = [vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT];
         let semaphores_finished = [self.swapchain.rendering_finished[self.swapchain.current_image]];
-        let commandbuffers = [self.commandbuffers[image_index as usize]];
+        let command_buffers = [self.command_buffers[image_index as usize]];
         let submit_info = [vk::SubmitInfo::builder()
             .wait_semaphores(&semaphores_available)
             .wait_dst_stage_mask(&waiting_stages)
-            .command_buffers(&commandbuffers)
+            .command_buffers(&command_buffers)
             .signal_semaphores(&semaphores_finished)
             .build()    
         ];
@@ -347,7 +362,7 @@ impl Drop for VulkanRenderer {
                 renderable.destroy(&self.device, &mut self.allocator);
             }
 
-            self.device.free_command_buffers(self.pools.graphics_command_pool, &self.commandbuffers);
+            self.device.free_command_buffers(self.pools.graphics_command_pool, &self.command_buffers);
 
             self.pools.cleanup(&self.device);
             self.pipeline.cleanup(&self.device);

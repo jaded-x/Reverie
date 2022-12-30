@@ -3,10 +3,14 @@ use winit::window::Window;
 
 use anyhow::Result;
 
-pub struct VulkanWindow {}
+pub struct VulkanWindow {
+    pub window: Window,
+    pub width: u32,
+    pub height: u32
+}
 
 impl VulkanWindow {
-    pub fn create_window(title: &'static str, width: u32, height: u32) -> Result<(EventLoop<()>, Window)> {
+    pub fn create_window(title: &'static str, width: u32, height: u32) -> Result<(EventLoop<()>, Self)> {
         let event_loop = EventLoop::new();
         let window = winit::window::WindowBuilder::new()
             .with_title(title)
@@ -14,6 +18,10 @@ impl VulkanWindow {
             .build(&event_loop)
             .expect("Failed to create window.");
 
-        Ok((event_loop, window))
+        Ok((event_loop, Self {
+                window,
+                width,
+                height
+        }))
     }
 }
