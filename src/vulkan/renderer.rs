@@ -1,7 +1,7 @@
 use ash::vk;
 use gpu_allocator::vulkan::{Allocator, AllocatorCreateDesc};
 
-use super::window::VulkanWindow;
+use super::{window::VulkanWindow};
 use super::surface::VulkanSurface;
 use super::debug::VulkanDebug;
 use super::physical_device::PhysicalDevice;
@@ -11,9 +11,9 @@ use super::swapchain::VulkanSwapchain;
 use super::render_pass::RenderPass;
 use super::pipeline::Pipeline;
 use super::command_pools::Pools;
-use super::renderable::Renderable;
+use super::game_object::GameObject;
 
-use crate::PushConstantData;
+use crate::utils::{align, any_as_u8_slice};
 
 pub struct VulkanRenderer {
     pub entry: ash::Entry,
@@ -33,7 +33,7 @@ pub struct VulkanRenderer {
     pub pools: Pools,
     pub command_buffers: Vec<vk::CommandBuffer>,
     pub allocator: std::mem::ManuallyDrop<Allocator>,
-    pub renderables: Vec<Renderable>
+    pub game_objects: Vec<GameObject>
 }
 
 impl VulkanRenderer {
@@ -95,7 +95,7 @@ impl VulkanRenderer {
             pools,
             command_buffers,
             allocator: std::mem::ManuallyDrop::new(allocator),
-            renderables: vec![]
+            game_objects: vec![]
         })
     }
 
@@ -180,7 +180,7 @@ impl VulkanRenderer {
         self.command_buffers = Self::create_commandbuffers(&self.device, &self.pools, self.swapchain.image_count)
             .expect("Failed to recreate command_buffers.");
 
-        Self::fill_commandbuffers(&self.command_buffers, &self.device, &self.renderpass, &self.swapchain, &self.pipeline, &self.renderables)
+        Self::fill_commandbuffers(&self.command_buffers, &self.device, &self.renderpass, &self.swapchain, &self.pipeline, &self.game_objects)
             .expect("Failed to fill commmandbuffers");
     }
 
@@ -194,7 +194,7 @@ impl VulkanRenderer {
         unsafe { logical_device.allocate_command_buffers(&commandbuffer_allocate_info) }
     }
 
-    pub fn fill_commandbuffers(command_buffers: &[vk::CommandBuffer], logical_device: &ash::Device, renderpass: &vk::RenderPass, swapchain: &VulkanSwapchain, pipeline: &Pipeline, renderables: &Vec<Renderable>
+    pub fn fill_commandbuffers(command_buffers: &[vk::CommandBuffer], logical_device: &ash::Device, renderpass: &vk::RenderPass, swapchain: &VulkanSwapchain, pipeline: &Pipeline, game_objects: &Vec<GameObject>
     ) -> Result<(), vk::Result> {
         unsafe {
             logical_device
@@ -210,8 +210,8 @@ impl VulkanRenderer {
             let clear_values = [vk::ClearValue {
                 color: vk::ClearColorValue {
                     float32: [0.0, 0.0, 0.0, 1.0]
-                },
-            }, vk::ClearValue {
+                }}, 
+                vk::ClearValue {
                 depth_stencil: vk::ClearDepthStencilValue {
                     depth: 1.0,
                     stencil: 0
@@ -247,30 +247,28 @@ impl VulkanRenderer {
                 logical_device.cmd_set_viewport(command_buffer, 0, &viewports);
                 logical_device.cmd_set_scissor(command_buffer, 0, &scissors);
 
-                for (_i, renderable) in renderables.iter().enumerate() {
+                for (_i, game_object) in game_objects.iter().enumerate() {
                     logical_device.cmd_bind_pipeline(command_buffer, vk::PipelineBindPoint::GRAPHICS, pipeline.pipeline);
-                    match &renderable.index_buffer {
+                    match &game_object.mesh.index_buffer {
                         Some(index_buffer) => {
                             logical_device.cmd_bind_index_buffer(command_buffer, index_buffer.get_buffer(), 0, vk::IndexType::UINT32);
-                            for vertex_buffer in &renderable.vertex_buffers {
+                            for vertex_buffer in &game_object.mesh.vertex_buffers {
                                 logical_device.cmd_bind_vertex_buffers(command_buffer, 0, &[vertex_buffer.get_buffer()], &[0]);
 
-                                for j in 0..4 {
-                                    let float = j as f32;
                                     let push = PushConstantData {
-                                        _offset: uv::Vec4::new(0.0, -0.4 * float * 0.25, 0.0, 1.0),
-                                        _color: uv::Vec4::new(0.0, 0.0, 0.2 + 0.2 * float, 1.0)
+                                        _transform: game_object.transform2d.mat2(),
+                                        _offset: game_object.transform2d.translation,
+                                        _color: align::Align16(game_object.color)
                                     };
-                                    let bytes = crate::utils::any_as_u8_slice(&push);
+                                    let bytes = push.as_bytes();
 
                                     logical_device.cmd_push_constants(command_buffer, pipeline.layout, vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::FRAGMENT, 0, &bytes);
                                     logical_device.cmd_draw_indexed(command_buffer, index_buffer.get_index_count(), 1, 0, 0, 0);
-                                }
                                 
                             }
                         },
                         None => {
-                            for vertex_buffer in &renderable.vertex_buffers {
+                            for vertex_buffer in &game_object.mesh.vertex_buffers {
                                 logical_device.cmd_bind_vertex_buffers(command_buffer, 0, &[vertex_buffer.get_buffer()], &[0]);
                                 logical_device.cmd_draw(command_buffer, vertex_buffer.get_vertex_count(), 1, 0, 0);
                             }
@@ -358,8 +356,8 @@ impl Drop for VulkanRenderer {
         unsafe {
             self.device.device_wait_idle().expect("Failed to wait for device idle!");
 
-            for renderable in &mut self.renderables {
-                renderable.destroy(&self.device, &mut self.allocator);
+            for game_object in &mut self.game_objects {
+                game_object.mesh.destroy(&self.device, &mut self.allocator);
             }
 
             self.device.free_command_buffers(self.pools.graphics_command_pool, &self.command_buffers);
@@ -374,5 +372,18 @@ impl Drop for VulkanRenderer {
             self.debug.cleanup();
             self.instance.destroy_instance(None)
         };
+    }
+}
+
+#[repr(C)]
+pub struct PushConstantData {
+    _transform: uv::Mat2,
+    _offset: uv::Vec2,
+    _color: align::Align16<uv::Vec3>
+}
+
+impl PushConstantData {
+    pub unsafe fn as_bytes(&self) -> &[u8] {
+        any_as_u8_slice(self)
     }
 }

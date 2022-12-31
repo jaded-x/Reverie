@@ -5,12 +5,12 @@ use super::vertex_buffer::VertexBuffer;
 use super::index_buffer::IndexBuffer;
 use super::vertex::Vertex;
 
-pub struct Renderable {
+pub struct Mesh {
     pub vertex_buffers: Vec<VertexBuffer>,
     pub index_buffer: Option<IndexBuffer>
 }
 
-impl Renderable {
+impl Mesh {
     pub fn new(device: &ash::Device, allocator: &mut Allocator, vertex_count: usize, index_count: usize) -> Result<Self, vk::Result> {
         let mut vertex_buffers = vec![];
         let vertex_buffer = VertexBuffer::new(device, allocator, VertexBuffer::get_vertex_buffer_size(vertex_count));
@@ -39,7 +39,7 @@ impl Renderable {
                 index_buffer.update_buffer(data);
             },
             None => {
-                println!("No index buffer on renderable");
+                println!("No index buffer on mesh");
             }
         }
     }

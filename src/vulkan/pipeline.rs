@@ -104,7 +104,8 @@ impl Pipeline {
             .stage_flags(vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::FRAGMENT)
             .offset(0)
             .size(std::mem::size_of::<PushConstantData>() as u32)
-            .build()];
+            .build()
+        ];
 
         let pipelinelayout_info = vk::PipelineLayoutCreateInfo::builder()
             .push_constant_ranges(&push_constant_range);
